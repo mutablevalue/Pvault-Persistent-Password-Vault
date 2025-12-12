@@ -1,4 +1,4 @@
-#include "server/vault.h"
+#include "client/vault.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

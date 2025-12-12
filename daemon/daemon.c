@@ -1,30 +1,117 @@
 #include "daemon.h"
+#include "../daemon/crypto.h"
 #include "socket.h"
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+static CryptoContext GCtx; // global context
 
-static void Loop(int Listener) {
+static void HandleClient(int Client) {
+  char Buffer[512];
+
   for (;;) {
-    int Client = accept(Listener, NULL, NULL);
-    if (Client < 0) {
+    ssize_t count = ReadLine(Client, Buffer, sizeof(Buffer));
+    if (count <= 0) {
+      break; // client closed or error
+    }
+
+    char *cmd = strtok(Buffer, " ");
+    char *arg = strtok(NULL, "");
+
+    if (!cmd) {
+      WriteLine(Client, "Error: Empty");
       continue;
     }
-    char Buffer[512];
-    ssize_t Count = ReadLine(Client, Buffer, sizeof(Buffer));
-    if (Count > 0) {
-      if (strcmp(Buffer, "PING") == 0) {
-        WriteLine(Client, "PONG");
+
+    if (strcmp(cmd, "ENSURE_UNLOCK") == 0) {
+      if (CryptoEnsureUnlocked(&GCtx) == 0) {
+        WriteLine(Client, "OK");
       } else {
-        WriteLine(Client, "UNKNOWN");
+        WriteLine(Client, "ERR unlock-failed");
       }
+      continue;
     }
-    close(Client);
+
+    if (!CryptoIsUnlocked(&GCtx)) {
+      WriteLine(Client, "ERR locked");
+      continue;
+    }
+
+    if (strcmp(cmd, "ADD") == 0) {
+      if (!arg || !*arg) {
+        WriteLine(Client, "ERR missing-name");
+        continue;
+      }
+      if (CryptoAddEntry(&GCtx, arg) == 0) {
+        WriteLine(Client, "OK");
+      } else {
+        WriteLine(Client, "ERR add-failed");
+      }
+      continue;
+    }
+
+    if (strcmp(cmd, "REMOVE") == 0) {
+      if (!arg || !*arg) {
+        WriteLine(Client, "ERR missing-name");
+        continue;
+      }
+      if (CryptoRemoveEntry(&GCtx, arg) == 0) {
+        WriteLine(Client, "OK");
+      } else {
+        WriteLine(Client, "NOT_FOUND");
+      }
+      continue;
+    }
+
+    if (strcmp(cmd, "FIND") == 0) {
+      if (!arg || !*arg) {
+        WriteLine(Client, "ERR missing-name");
+        continue;
+      }
+      if (CryptoFindEntry(&GCtx, arg) == 0) {
+        WriteLine(Client, "FOUND");
+      } else {
+        WriteLine(Client, "NOT_FOUND");
+      }
+      continue;
+    }
+
+    if (strcmp(cmd, "LIST") == 0) {
+      CryptoListEntries(&GCtx, arg ? arg : "");
+      WriteLine(Client, "OK");
+      continue;
+    }
+
+    if (strcmp(cmd, "DUMP") == 0) {
+      CryptoDumpEntries(&GCtx);
+      WriteLine(Client, "OK");
+      continue;
+    }
+
+    WriteLine(Client, "ERR unknown-command");
   }
 }
+
+static void Loop(int Listener) {
+  CryptoInitContext(&GCtx);
+  if (CryptoLoadVault(&GCtx) != 0) {
+    fprintf(stderr, "Failed to load vault file\n");
+    _exit(1);
+  }
+  for (;;) {
+    int Client = accept(Listener, NULL, NULL);
+    if (Client < 0)
+      continue;
+    HandleClient(Client);
+    close(Client);
+  }
+
+  CryptoFreeContext(&GCtx);
+}
+
 void StartService(int Listener) { Loop(Listener); }
 ssize_t ReadLine(int Socket, char *Buffer, size_t Size) {
   if (!Buffer || Size == 0)
@@ -39,6 +126,8 @@ ssize_t ReadLine(int Socket, char *Buffer, size_t Size) {
       Buffer[Position] = '\0';
       return -1;
     }
+    if (Current == '\r')
+      continue;
     if (Current == '\n')
       break;
     if (Position + 1 < Size) {

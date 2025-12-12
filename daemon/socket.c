@@ -10,17 +10,22 @@
 #include <unistd.h>
 
 static const char *GetSocketPath(void) {
-  const char *XDG = getenv("XDG_RUNTIME_DIR");
-  if (!XDG || !XDG[0])
-    XDG = "/tmp";
+  const char *XdgRuntimeDir = getenv("XDG_RUNTIME_DIR");
+  if (!XdgRuntimeDir || !XdgRuntimeDir[0]) {
+    fprintf(stderr,
+            "XDG_RUNTIME_DIR is not set; cannot create daemon socket\n");
+    return NULL;
+  }
 
-  static char path[512];
-  snprintf(path, sizeof(path), "%s/%s", XDG, "vaultd.sock");
-  return path;
+  static char Path[512];
+  snprintf(Path, sizeof(Path), "%s/pvault.sock", XdgRuntimeDir);
+  return Path;
 }
 
 int ConnectToDaemon(void) {
   const char *Path = GetSocketPath();
+  if (!Path)
+    return -1;
 
   int Socket = socket(AF_UNIX, SOCK_STREAM, 0);
   if (Socket < 0)
@@ -41,6 +46,8 @@ int ConnectToDaemon(void) {
 
 int EnsureListener(void) {
   const char *Path = GetSocketPath();
+  if (!Path)
+    return -1;
 
   int Socket = socket(AF_UNIX, SOCK_STREAM, 0);
   if (Socket < 0)
