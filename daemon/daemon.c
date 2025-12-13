@@ -201,7 +201,8 @@ int EnsureDaemon(void) {
   pid_t Pid = fork();
   if (Pid < 0)
     return -1;
-
+  // We simply find the process id the daemon is running on and establish a
+  // piped listener
   if (Pid == 0) {
     close(PipeFds[0]);
     setsid();

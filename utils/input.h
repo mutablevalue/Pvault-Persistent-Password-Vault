@@ -4,10 +4,10 @@
 #include <string.h>
 
 typedef enum { ADD, REMOVE, FIND, LIST, DUMP, NONE } Mode;
-
+// possible inputs
 typedef struct {
   Mode CurrentMode;
   const char *Target;
 } Options;
-
+// target is the arg
 Options Parse(int argc, char **argv);

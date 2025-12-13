@@ -5,9 +5,8 @@
 #include <stdio.h>
 
 int PromptUser(const char *PromptText, char *Buffer, size_t BufferSize);
-
+// global prompt
 char *DuplicateString(const char *Text);
-
 void WriteU32LittleEndian(unsigned char *Destination, uint32_t Value);
 int ReadU32LittleEndian(const unsigned char *Source, const unsigned char *End,
                         uint32_t *OutValue);

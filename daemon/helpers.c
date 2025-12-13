@@ -33,7 +33,8 @@ void WriteU32LittleEndian(unsigned char *Destination, uint32_t Value) {
   Destination[2] = (unsigned char)((Value >> 16) & 0xFF);
   Destination[3] = (unsigned char)((Value >> 24) & 0xFF);
 }
-
+// all reads/writes will simply just cast -> shift bytes take only the least
+// signficant byte
 int ReadU32LittleEndian(const unsigned char *Source, const unsigned char *End,
                         uint32_t *OutValue) {
   if (!Source || !OutValue || Source + 4 > End)

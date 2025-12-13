@@ -4,7 +4,9 @@
 #include <stdint.h>
 
 #include <sodium.h>
-
+// encryption algo = XSalsa20
+// Construction Algo = AEAD XSalsa20
+// Auth Poly1305
 typedef struct {
   unsigned char *Cipher;
   size_t CipherLength;
@@ -26,11 +28,11 @@ typedef struct {
   unsigned char MasterKey[crypto_secretbox_KEYBYTES];
   unsigned char Salt[crypto_pwhash_SALTBYTES];
 
-  EncEntry Check;
+  EncEntry Check; // if this is the first time setting up the vault
   int HasCheck;
 
-  int HasMaster;
-  int Unlocked;
+  int HasMaster; // if they need to create a master password
+  int Unlocked;  // master password accepted
 } CryptoContext;
 
 int PackEntry(const PlainEntry *Entry, unsigned char **OutBuffer,
@@ -38,10 +40,10 @@ int PackEntry(const PlainEntry *Entry, unsigned char **OutBuffer,
 
 int UnpackEntry(const unsigned char *Buffer, size_t BufferLength,
                 PlainEntry *OutEntry);
-
+// compression / decompression
 void CryptoInitContext(CryptoContext *Context);
 void CryptoFreeContext(CryptoContext *Context);
-
+// Starts up context window
 int CryptoIsUnlocked(const CryptoContext *Context);
 int CryptoHasMaster(const CryptoContext *Context);
 
