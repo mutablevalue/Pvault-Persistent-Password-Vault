@@ -24,7 +24,8 @@ The tool is designed to be simple, local-only, and transparent.
 4. If needed, the client prompts for the master password
 5. The requested operation is performed by the daemon
 
-The daemon never reads from stdin. All user input happens in the client.
+The daemon never reads from stdin.  
+All user input happens in the client.
 
 ---
 
@@ -32,82 +33,63 @@ The daemon never reads from stdin. All user input happens in the client.
 
 The encrypted vault file is stored at:
 
-
-
 $XDG_DATA_HOME/pvault/vault.dat
-
 
 If `XDG_DATA_HOME` is not set, it defaults to:
 
-
-
 ~/.local/share/pvault/vault.dat
-
 
 ---
 
 ## Commands
 
 ### Add an entry
-```bash
 pvault --add SERVICE
 
-
 Prompts for:
-
-username (optional)
-
-password (press enter to auto-generate)
-
-link (optional)
+- username (optional)
+- password (press enter to auto-generate)
+- link (optional)
 
 If the service already exists, it is replaced.
 
-Find an entry
+### Find an entry
 pvault --find SERVICE
 
-
 Prints:
+- service
+- username
+- password
+- link
 
-service
-
-username
-
-password
-
-link
-
-Remove an entry
+### Remove an entry
 pvault --remove SERVICE
-
 
 Deletes the entry for the given service.
 
-List entries
+### List entries
 pvault --list
 pvault --list all
 pvault --list N
 
-
-No argument: list up to 5 entries
-
-all: list every entry
-
+No argument: list up to 5 entries  
+all: list every entry  
 N: list the first N entries
 
-Dump decrypted vault
+### Dump decrypted vault
 pvault --dump
-
 
 Creates a plaintext dump of all entries in:
 
 ~/Downloads/pvault_dump_XXXXXX.txt
 
-
 This file is decrypted and should be handled carefully.
 
-Installation
-Build
+---
+
+## Installation
+
+### Build
 gcc -std=c11 -Wall -Wextra -O2 \
   $(find . -name '*.c') \
   -o pvault -lsodium
