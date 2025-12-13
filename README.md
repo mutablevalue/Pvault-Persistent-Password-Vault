@@ -1,45 +1,131 @@
-# pvault
+pvault - Persistent Password Vault
+================================
 
-`pvault` is a local password manager written in C.  
-It encrypts all stored credentials using libsodium and runs a background daemon so the vault only needs to be unlocked once per session.
+pvault is a local, CLI-based password manager written in C.
+It encrypts all credentials using libsodium and uses a background daemon
+to keep the vault unlocked for the duration of a user session.
 
-The tool is designed to be simple, local-only, and transparent.
+The project is intentionally local-only and avoids network access,
+external services, or cloud dependencies.
 
----
+------------------------------------------------------------
+Summary
+------------------------------------------------------------
 
-## Summary
+- Written in C for Linux
+- Encrypted vault stored on disk
+- Background daemon keeps secrets unlocked in memory
+- Client communicates with daemon over a UNIX domain socket
+- Uses XDG-compliant paths
+- No network access
 
-- All data is stored encrypted on disk
-- A background daemon keeps the vault unlocked in memory
-- Commands communicate with the daemon over a UNIX socket
-- No network access and no external services
+------------------------------------------------------------
+Threat Model
+------------------------------------------------------------
 
----
+pvault is designed to protect against:
 
-## How It Works
+- Offline attackers who obtain a copy of the encrypted vault file
+- Accidental credential exposure via plaintext files
+- Other unprivileged users on the same system (with proper permissions)
 
-1. You run a `pvault` command
-2. If the daemon is not running, it is started automatically
-3. The daemon checks whether the vault is unlocked
-4. If needed, the client prompts for the master password
-5. The requested operation is performed by the daemon
+pvault does NOT protect against:
 
-The daemon never reads from stdin.  
-All user input happens in the client.
+- An attacker with root access
+- A compromised kernel
+- Malicious code running as the same user
+- Memory inspection attacks while the vault is unlocked
 
----
+This project prioritizes usability and simplicity over maximum resistance
+to advanced local attackers.
 
-## Vault Location
+------------------------------------------------------------
+How It Works
+------------------------------------------------------------
 
-The encrypted vault file is stored at:
+1. A pvault client command is executed
+2. The client checks if the daemon is running
+3. If not running, the daemon is started automatically
+4. The client communicates with the daemon over a UNIX socket
+5. If the vault is locked, the client prompts for the master password
+6. The daemon decrypts the vault into memory
+7. Subsequent commands reuse the unlocked in-memory state
 
-$XDG_DATA_HOME/pvault/vault.dat
+The daemon never reads from stdin.
+All user interaction happens in the client.
 
-If `XDG_DATA_HOME` is not set, it defaults to:
+------------------------------------------------------------
+Security Design
+------------------------------------------------------------
 
-~/.local/share/pvault/vault.dat
+Encryption
+- libsodium is used for all cryptographic operations
+- A password-based key derivation function (KDF) derives the master key
+- Each vault entry is encrypted using an AEAD construction
+- Nonces are generated securely and stored with ciphertext
+- Vault format includes versioning for future upgrades
 
----
+Memory Handling
+- Secrets exist in plaintext only while the vault is unlocked
+- Sensitive buffers are wiped using sodium_memzero when no longer needed
+- The daemon holds decrypted data only in process memory
+
+------------------------------------------------------------
+Daemon & IPC Security
+------------------------------------------------------------
+
+- Communication uses a UNIX domain socket
+- Socket is created under XDG_RUNTIME_DIR or /tmp as fallback
+- Socket permissions are restricted to the current user
+- Only local clients owned by the same UID can connect
+- No network sockets are opened
+
+------------------------------------------------------------
+Auto-Locking & Lifecycle
+------------------------------------------------------------
+
+- Vault unlock state exists only while the daemon is running
+- Restarting the system or killing the daemon locks the vault
+- Future improvements may include:
+  - Idle timeout auto-lock
+  - Explicit lock command
+  - systemd user service integration
+
+------------------------------------------------------------
+Vault Location
+------------------------------------------------------------
+
+Encrypted vault file:
+
+  $XDG_DATA_HOME/pvault/vault
+  (fallback: $HOME/.local/share/pvault/vault)
+
+Runtime socket:
+
+  $XDG_RUNTIME_DIR/pvault.sock
+  (fallback: /tmp/pvault.sock)
+
+------------------------------------------------------------
+Limitations
+------------------------------------------------------------
+
+- No synchronization across machines
+- No GUI (CLI-only by design)
+- No protection against same-user malware
+- Secrets are accessible while daemon is unlocked
+
+------------------------------------------------------------
+Project Goals
+------------------------------------------------------------
+
+pvault is intended as:
+
+- A systems programming project
+- A security-focused learning exercise
+- A demonstration of IPC, daemons, and cryptographic hygiene in C
+
+It is not intended to replace mature password managers.
+------------------------------------------------------------
 
 ## Commands
 
@@ -85,7 +171,7 @@ Creates a plaintext dump of all entries in:
 
 This file is decrypted and should be handled carefully.
 
----
+------------------------------------------------------------
 
 ## Installation
 
