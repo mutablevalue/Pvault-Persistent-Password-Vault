@@ -5,6 +5,7 @@
 #include <string.h>
 
 typedef struct {
+  int Unused;
 } Vault;
 
 void Init(Vault *Current, int argc, char **argv);
