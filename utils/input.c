@@ -6,7 +6,7 @@
 Options Parse(int argc, char **argv) {
   Options Option = {.CurrentMode = NONE, .Target = NULL};
 
-  if (argc < 1)
+  if (argc < 1 || argc > 3)
     return Option;
 
   if (strcmp(argv[1], "--add") == 0) {
@@ -25,7 +25,7 @@ Options Parse(int argc, char **argv) {
     Option.CurrentMode = FIND;
     Option.Target = argv[2];
   } else if (strcmp(argv[1], "--list") == 0) {
-    if (argc >= 3)
+    if (argc == 3)
       Option.Target = argv[2];
     Option.CurrentMode = LIST;
   } else if (strcmp(argv[1], "--dump") == 0) {

@@ -241,8 +241,15 @@ int PackEntry(const PlainEntry *Entry, unsigned char **OutBuffer,
   uint32_t PasswordLength = (uint32_t)strlen(Entry->Password) + 1;
   uint32_t LinkLength = Entry->Link ? (uint32_t)strlen(Entry->Link) + 1 : 0;
 
-  size_t TotalLength = 16u + (size_t)ServiceLength + (size_t)UsernameLength +
-                       (size_t)PasswordLength + (size_t)LinkLength;
+  size_t TotalLength = 16;
+  if (__builtin_add_overflow(TotalLength, (size_t)ServiceLength, &TotalLength))
+    return -1;
+  if (__builtin_add_overflow(TotalLength, (size_t)UsernameLength, &TotalLength))
+    return -1;
+  if (__builtin_add_overflow(TotalLength, (size_t)PasswordLength, &TotalLength))
+    return -1;
+  if (__builtin_add_overflow(TotalLength, (size_t)LinkLength, &TotalLength))
+    return -1;
 
   unsigned char *Buffer = malloc(TotalLength);
   if (!Buffer)
@@ -311,8 +318,18 @@ int UnpackEntry(const unsigned char *Buffer, size_t BufferLength,
   if (ServiceLength == 0 || PasswordLength == 0)
     return -1;
 
-  if ((size_t)(End - Cursor) < (size_t)ServiceLength + (size_t)UsernameLength +
-                                   (size_t)PasswordLength + (size_t)LinkLength)
+  size_t need = 0;
+  if (__builtin_add_overflow(need, (size_t)ServiceLength, &need))
+    return -1;
+  if (__builtin_add_overflow(need, (size_t)UsernameLength, &need))
+    return -1;
+  if (__builtin_add_overflow(need, (size_t)PasswordLength, &need))
+    return -1;
+  if (__builtin_add_overflow(need, (size_t)LinkLength, &need))
+    return -1;
+
+  size_t remaining = (size_t)(End - Cursor);
+  if (remaining < need)
     return -1;
 
   OutEntry->Service = malloc(ServiceLength);
