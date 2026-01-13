@@ -1,6 +1,7 @@
 #include "../client/vault.h"
 #include "../daemon/daemon.h"
 
+#include "../client/message.c"
 #include "../daemon/helpers.h"
 #include <stdio.h>
 #include <string.h>
@@ -25,6 +26,11 @@ static int SendRequestAndReadUntilTerminal(int Socket, const char *Request) {
 
     if (strcmp(Response, "OK") == 0)
       return 0;
+
+    if (strcmp(Response, "MESSAGE") == 0) {
+      fputs(GetMessage(), stdout);
+      return 0;
+    }
 
     if (strcmp(Response, "NOT_FOUND") == 0)
       return -2;
@@ -136,6 +142,13 @@ void Init(Vault *Current, int ArgCount, char **ArgValues) {
     break;
   case DUMP:
     snprintf(Request, sizeof(Request), "DUMP");
+    break;
+  case HELP:
+    snprintf(Request, sizeof(Request), "HELP");
+    break;
+  case UPDATE:
+    snprintf(Request, sizeof(Request), "UPDATE %s %s %s", Option.Target,
+             Option.Field, Option.Value);
     break;
   default:
     close(Socket);

@@ -53,7 +53,8 @@ int CryptoCreateMasterWithPassword(CryptoContext *Context,
 
 int CryptoAddEntry(CryptoContext *Context, const char *Name);
 int CryptoRemoveEntry(CryptoContext *Context, const char *Name);
-
+int CryptoUpdateEntry(CryptoContext *Context, const char *EntryName,
+                      const char *Field, const char *Value);
 int CryptoFindEntryToSocket(CryptoContext *Context, const char *Name,
                             int SocketFd);
 int CryptoListEntriesToSocket(CryptoContext *Context, const char *Arg,

@@ -154,6 +154,37 @@ static void HandleClient(int ClientFd) {
       continue;
     }
 
+    if (strcmp(Command, "UPDATE") == 0) {
+      if (!Argument || !Argument[0]) {
+        WriteLine(ClientFd, "ERR update_missing");
+        continue;
+      }
+
+      char *Service = strtok(Argument, " ");
+      char *Field = strtok(NULL, " ");
+      char *Value = strtok(NULL, "");
+
+      if (!Service || !Service[0] || !Field || !Field[0] || !Value ||
+          !Value[0]) {
+        WriteLine(ClientFd, "ERR update_args");
+        continue;
+      }
+
+      int Response = CryptoUpdateEntry(&GlobalContext, Service, Field, Value);
+      if (Response == 0)
+        WriteLine(ClientFd, "OK");
+      else if (Response == -2)
+        WriteLine(ClientFd, "NOT_FOUND");
+      else
+        WriteLine(ClientFd, "ERR update");
+      continue;
+    }
+
+    if (strcmp(Command, "HELP") == 0) {
+      WriteLine(ClientFd, "MESSAGE");
+      continue;
+    }
+
     if (strcmp(Command, "DUMP") == 0) {
       char *Path = NULL;
       if (CryptoDumpEntriesDecrypted(&GlobalContext, &Path) == 0 && Path) {

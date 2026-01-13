@@ -1,14 +1,14 @@
 #define _GNU_SOURCE
 #include <errno.h>
+#include <sodium.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-
-#include <sodium.h>
 
 #include "crypto.h"
 #include "helpers.h"
@@ -561,6 +561,128 @@ int CryptoCreateMasterWithPassword(CryptoContext *Context,
 
   Context->Unlocked = 1;
   return 0;
+}
+
+int CryptoUpdateEntry(CryptoContext *Context, const char *EntryName,
+                      const char *Field, const char *Value) {
+  if (!Context || !EntryName || !Field || !Value)
+    return -1;
+  if (!EntryName[0] || !Field[0] || !Value[0])
+    return -1;
+  if (!Context->Unlocked)
+    return -1;
+
+  enum { UPDATE_USERNAME, UPDATE_PASSWORD, UPDATE_LINK } UpdateKind;
+  if (strcasecmp(Field, "username") == 0) {
+    UpdateKind = UPDATE_USERNAME;
+  } else if (strcasecmp(Field, "password") == 0) {
+    UpdateKind = UPDATE_PASSWORD;
+  } else if (strcasecmp(Field, "link") == 0) {
+    UpdateKind = UPDATE_LINK;
+  } else {
+    return -1;
+  }
+
+  size_t FoundIndex = 0;
+  if (FindServiceIndex(Context, EntryName, &FoundIndex) != 0)
+    return -2; /* NOT_FOUND */
+
+  EncEntry *EncryptedEntry = &Context->Entries[FoundIndex];
+
+  unsigned char *Plain = NULL;
+  size_t PlainLength = 0;
+  if (DecryptEntryToPlain(Context, EncryptedEntry, &Plain, &PlainLength) != 0)
+    return -1;
+
+  int Result = -1;
+  PlainEntry Decoded;
+  memset(&Decoded, 0, sizeof(Decoded));
+
+  if (UnpackEntry(Plain, PlainLength, &Decoded) != 0)
+    goto Cleanup;
+
+  if (UpdateKind == UPDATE_USERNAME) {
+    if (Decoded.Username) {
+      sodium_memzero(Decoded.Username, strlen(Decoded.Username));
+      free(Decoded.Username);
+      Decoded.Username = NULL;
+    }
+    Decoded.Username = DuplicateString(Value);
+    if (!Decoded.Username)
+      goto Cleanup;
+
+  } else if (UpdateKind == UPDATE_PASSWORD) {
+    if (Decoded.Password) {
+      sodium_memzero(Decoded.Password, strlen(Decoded.Password));
+      free(Decoded.Password);
+      Decoded.Password = NULL;
+    }
+    Decoded.Password = DuplicateString(Value);
+    if (!Decoded.Password)
+      goto Cleanup;
+
+  } else {
+    if (Decoded.Link) {
+      sodium_memzero(Decoded.Link, strlen(Decoded.Link));
+      free(Decoded.Link);
+      Decoded.Link = NULL;
+    }
+    Decoded.Link = DuplicateString(Value);
+    if (!Decoded.Link)
+      goto Cleanup;
+  }
+
+  /* Repack */
+  unsigned char *Packed = NULL;
+  size_t PackedLength = 0;
+  if (PackEntry(&Decoded, &Packed, &PackedLength) != 0)
+    goto Cleanup;
+
+  /* Encrypt updated entry */
+  EncEntry NewEntry;
+  memset(&NewEntry, 0, sizeof(NewEntry));
+  randombytes_buf(NewEntry.Nonce, sizeof(NewEntry.Nonce));
+
+  NewEntry.CipherLength = PackedLength + crypto_secretbox_MACBYTES;
+  NewEntry.Cipher = malloc(NewEntry.CipherLength);
+  if (!NewEntry.Cipher) {
+    sodium_memzero(Packed, PackedLength);
+    free(Packed);
+    goto Cleanup;
+  }
+
+  if (crypto_secretbox_easy(NewEntry.Cipher, Packed,
+                            (unsigned long long)PackedLength, NewEntry.Nonce,
+                            Context->MasterKey) != 0) {
+    sodium_memzero(Packed, PackedLength);
+    free(Packed);
+    free(NewEntry.Cipher);
+    goto Cleanup;
+  }
+
+  sodium_memzero(Packed, PackedLength);
+  free(Packed);
+
+  // rollback on failure
+  EncEntry OldEntry = *EncryptedEntry;
+  *EncryptedEntry = NewEntry;
+
+  if (CryptoSaveVault(Context) != 0) {
+    free(EncryptedEntry->Cipher);
+    *EncryptedEntry = OldEntry;
+    goto Cleanup;
+  }
+
+  free(OldEntry.Cipher);
+  Result = 0;
+
+Cleanup:
+  if (Plain) {
+    sodium_memzero(Plain, PlainLength);
+    free(Plain);
+  }
+  FreePlainEntry(&Decoded);
+  return Result;
 }
 
 int CryptoAddEntry(CryptoContext *Context, const char *Name) {
